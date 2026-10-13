@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
+
 # Install prerequisites
 apt install pandoc
 
@@ -17,8 +19,8 @@ pandoc -s \
   --highlight-style=pygments \
   --metadata title="Linux Mirror Setup" \
   -c style.css \
-  "/opt/linux-mirror-site/$MARKDOWN" \
+  "$SCRIPT_DIR/$MARKDOWN" \
   -o "$TARGET/index.html"
 
-install -m 644 /opt/linux-mirror-site/setup.sh "$TARGET/setup.sh"
-install -m 644 "/opt/linux-mirror-site/$CSS" "$TARGET/style.css"
+install -m 644 "$SCRIPT_DIR/setup.sh" "$TARGET/setup.sh"
+install -m 644 "$SCRIPT_DIR/$CSS" "$TARGET/style.css"
