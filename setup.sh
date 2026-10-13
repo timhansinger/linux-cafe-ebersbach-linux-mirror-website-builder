@@ -3,7 +3,7 @@
 # ==================================================
 # GLOBAL VARIABLE
 # ==================================================
-LAB_MIRROR="linux-mirror"
+LINUX_MIRROR="linux-mirror"
 
 # ==================================================
 # DEFAULT CONFIGURATIONS (Flags)
@@ -209,7 +209,7 @@ sed -E \
     -e 's|\$codename|'"$codename"'|g' \
     -e 's|\$basecodename|'"$basecodename"'|g' \
     -e 's|\$optionalcomponents|'"$optionalcomponents"'|g' \
-    -e "s|https?://|http://${LAB_MIRROR}/|g" \
+    -e "s|https?://|http://${LINUX_MIRROR}/|g" \
     "$TEMPLATE_FILE" > "$TEMPORARY_MIRROR_LIST"
 
 if [[ ! -f "$TEMPORARY_MIRROR_LIST" ]] || [[ ! -s "$TEMPORARY_MIRROR_LIST" ]]; then
@@ -247,7 +247,7 @@ echo "--> Restoring customer machine back to default official repositories..."
 sudo mv "$BACKUP_SOURCES" "$ORIGINAL_SOURCES"
 
 if [ "$SKIP_CLEANUP" = true ]; then
-  echo "--> [SKIPPED] Cleanup step skipped by request. Lab configurations left intact."
+  echo "--> [SKIPPED] Cleanup step skipped by request. Linux-mirror configurations left intact."
   echo "    Files left on disk:"
   echo "    - $TEMP_SOURCES"
 else
