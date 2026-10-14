@@ -3,7 +3,7 @@
 # ==================================================
 # GLOBAL VARIABLE
 # ==================================================
-LINUX_MIRROR="linux-mirror"
+LINUX_MIRROR="linux-mirror.local"
 
 # ==================================================
 # DEFAULT CONFIGURATIONS (Flags)

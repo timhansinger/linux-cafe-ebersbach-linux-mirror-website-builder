@@ -5,7 +5,7 @@ Diese Maschine stellt einen lokalen apt-Mirror sowie ein Hilfsskript für Update
 ## Führen Sie dies auf Ihrem Client-Rechner aus
 
 ```bash
-curl -fsSL http://linux-mirror/setup.sh | bash -s -- run
+curl -fsSL http://linux-mirror.local/setup.sh | bash -s -- run
 ```
 
 ## Was es macht
@@ -23,19 +23,19 @@ curl -fsSL http://linux-mirror/setup.sh | bash -s -- run
 - prüfen Sie das Skript vorher, falls gewünscht:
 
 ```bash
-curl -fsSL http://linux-mirror/setup.sh
+curl -fsSL http://linux-mirror.local/setup.sh
 ```
 
 - Sie können es auch als Probelauf ausführen (das Skript wird vollständig simuliert, ohne Änderungen an Ihrem System vorzunehmen):
 
 ```bash
-curl -fsSL http://linux-mirror/setup.sh | bash -s -- run --dry-run
+curl -fsSL http://linux-mirror.local/setup.sh | bash -s -- run --dry-run
 ```
 
 - oder laden Sie es herunter:
 
 ```bash
-curl -fsSLO http://linux-mirror/setup.sh
+curl -fsSLO http://linux-mirror.local/setup.sh
 ```
 
 ## Festlegen aller Einstellungen / Installation zusätzlicher Programme
