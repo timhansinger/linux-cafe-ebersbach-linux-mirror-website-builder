@@ -23,4 +23,5 @@ pandoc -s \
   -o "$TARGET/index.html"
 
 install -m 644 "$SCRIPT_DIR/setup.sh" "$TARGET/setup.sh"
+install -m 644 "$SCRIPT_DIR/post-install-script.sh" "$TARGET/post-install-script.sh"
 install -m 644 "$SCRIPT_DIR/$CSS" "$TARGET/style.css"

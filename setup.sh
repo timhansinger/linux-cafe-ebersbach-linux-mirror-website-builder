@@ -9,7 +9,6 @@ LINUX_MIRROR="linux-mirror.local"
 # DEFAULT CONFIGURATIONS (Flags)
 # ==================================================
 DRY_RUN=false
-SKIP_CLEANUP=false
 DRY_FLAG=""
 
 # ==================================================
@@ -27,8 +26,6 @@ show_help() {
   echo "Options (only applicable with the 'run' command):"
   echo "  -d, --dry-run        Simulate the upgrade process. Does not download"
   echo "                       or install any packages to the drive."
-  echo "  -s, --skip-cleanup   Prevents the script from removing the temporary"
-  echo "                       mirror list and preference files upon exit."
   echo "  -h, --help           Display this help screen and exit."
   echo ""
   echo "Examples:"
@@ -90,7 +87,6 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     -h|--help)         show_help ;;
     -d|--dry-run)      DRY_RUN=true; DRY_FLAG="-s"; shift ;;
-    -s|--skip-cleanup) SKIP_CLEANUP=true; shift ;;
     *) echo "Unknown option: $1"; echo "Use $0 --help to see available options."; exit 1 ;;
   esac
 done
@@ -131,13 +127,46 @@ echo "=================================================="
 
 # Show active flags to the technician
 [ "$DRY_RUN" = true ] && echo "--> MODE: [DRY-RUN / SIMULATION]"
-[ "$SKIP_CLEANUP" = true ] && echo "--> SETTING: [SKIP CLEANUP ACTIVE]"
 
 # Define paths
 ORIGINAL_SOURCES="/etc/apt/sources.list.d/official-package-repositories.list"
 BACKUP_SOURCES="/etc/apt/sources.list.d/official-package-repositories.list.bak"
 TEMPORARY_MIRROR_LIST="/tmp/00-local-mirror.list"
 TEMP_SOURCES="/etc/apt/sources.list.d/00-local-mirror.list"
+
+# ==================================================
+# INITIALIZE CLEANUP / TRAP - START
+# ==================================================
+cleanup() {
+    local code=$?
+    trap - EXIT INT TERM # avoid re-entry
+
+    echo -e "\nCleaning up (code $code, signal: ${SIGNAL:-none})"
+
+    # echo -e "\nScript completed. Running cleanup..."
+
+    echo "--> Restoring customer machine back to default official repositories..."
+    # Bring the official file back
+    sudo mv "$BACKUP_SOURCES" "$ORIGINAL_SOURCES" 2>/dev/null
+    
+    # Delete the temporary local mirror file
+    sudo rm -f "$TEMP_SOURCES" 2>/dev/null
+
+    # Re-index so the customer's cache points home
+    echo "--> Re-indexing database back to official web paths..."
+    sudo apt-get update
+
+    # TODO: sudo apt autoremove -y
+
+    exit "$code"
+}
+
+trap 'SIGNAL=SIGINT;  exit 130' INT
+trap 'SIGNAL=SIGTERM; exit 143' TERM
+trap cleanup EXIT
+# ==================================================
+# INITIALIZE CLEANUP / TRAP - END
+# ==================================================
 
 # Verify official list exists
 if [ ! -f "$ORIGINAL_SOURCES" ]; then
@@ -238,28 +267,6 @@ sudo apt-get update
 
 echo "--> Upgrading system packages..."
 sudo apt-get dist-upgrade $DRY_FLAG -y
-
-# ==================================================
-# 4. CONDITIONAL CLEAN UP
-# ==================================================
-echo "--> Restoring customer machine back to default official repositories..."
-# Bring the official file back
-sudo mv "$BACKUP_SOURCES" "$ORIGINAL_SOURCES"
-
-if [ "$SKIP_CLEANUP" = true ]; then
-  echo "--> [SKIPPED] Cleanup step skipped by request. Linux-mirror configurations left intact."
-  echo "    Files left on disk:"
-  echo "    - $TEMP_SOURCES"
-else
-  # Delete the temporary local mirror file
-  sudo rm -f "$TEMP_SOURCES"
-
-  # Re-index so the customer's cache points home
-  echo "--> Re-indexing database back to official web paths..."
-  sudo apt-get update
-fi
-
-# TODO: sudo apt autoremove -y
 
 echo "=================================================="
 echo " Done! All user configurations and updates applied. "
