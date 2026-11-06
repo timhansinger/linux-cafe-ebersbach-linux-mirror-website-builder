@@ -74,11 +74,12 @@ extract_value() {
   return 0
 }
 
+echo "$1"
 # ==================================================
 # SUBCOMMAND VALIDATION
 # ==================================================
-# If no arguments are passed, or the first argument isn't "run", show help.
-if [ $# -eq 0 ] || [ "$1" != "run" ] || [ "$1" != "only-post-install" ]; then
+# If no arguments are passed, or the first argument isn't either "run" or "only-post-install", show help.
+if [ $# -eq 0 ] || { [ "$1" != "run" ] && [ "$1" != "only-post-install" ]; }; then
   # If they specifically asked for help via -h or --help, show it too
   show_help
 fi
