@@ -9,7 +9,7 @@ apt install pandoc
 # MARKDOWN=index.md
 MARKDOWN=index-german.md
 CSS="github-markdown-light.css"
-TARGET="/srv/apt-mirror/mirror"
+TARGET="/srv/aptly/public"
 
 install -d "$TARGET"
 
