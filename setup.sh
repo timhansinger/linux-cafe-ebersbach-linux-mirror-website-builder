@@ -156,8 +156,6 @@ cleanup() {
     echo "--> Re-indexing database back to official web paths..."
     sudo apt-get update
 
-    # TODO: sudo apt autoremove -y
-
     exit "$code"
 }
 
@@ -226,19 +224,17 @@ echo ""
 
 # Process template
 TEMPLATE_FILE="/usr/share/mintsources/${codename}/official-package-repositories.list"
-#OUTPUT_FILE="/etc/apt/sources.list.d/linuxmint-${codename}.list"
-#OUTPUT_FILE="/tmp/00-local-mirror.list"
 
 [[ -f "$TEMPLATE_FILE" ]] || { echo "Error: Template not found: $TEMPLATE_FILE" >&2; exit 1; }
 
 # Substitute variables using sed
 sed -E \
-    -e 's|\$mirror|'"$mirror"'|g' \
-    -e 's|\$basemirror|'"$basemirror"'|g' \
+    -e 's|\$mirror|'"[trusted=yes] http://${LINUX_MIRROR}/mint"'|g' \
+    -e 's|\$basemirror|'"[trusted=yes] http://${LINUX_MIRROR}/ubuntu"'|g' \
     -e 's|\$codename|'"$codename"'|g' \
     -e 's|\$basecodename|'"$basecodename"'|g' \
     -e 's|\$optionalcomponents|'"$optionalcomponents"'|g' \
-    -e "s|https?://|http://${LINUX_MIRROR}/|g" \
+    -e "s|https?://security.ubuntu.com/ubuntu/?|[trusted=yes] http://${LINUX_MIRROR}/ubuntu|g" \
     "$TEMPLATE_FILE" > "$TEMPORARY_MIRROR_LIST"
 
 if [[ ! -f "$TEMPORARY_MIRROR_LIST" ]] || [[ ! -s "$TEMPORARY_MIRROR_LIST" ]]; then
@@ -258,7 +254,7 @@ echo ""
 cat "$TEMP_SOURCES"
 
 # HIDE THE OFFICIAL LIST (Move it so APT ignores it entirely)
-# This guarantees APT can ONLY talk to linux-mirror for system packages
+# This guarantees APT can ONLY talk to LINUX_MIRROR for system packages
 sudo mv "$ORIGINAL_SOURCES" "$BACKUP_SOURCES"
 
 # Run system updates using our background-authenticated sudo
