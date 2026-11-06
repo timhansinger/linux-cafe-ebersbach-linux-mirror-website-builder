@@ -9,7 +9,9 @@ LINUX_MIRROR="linux-mirror.local"
 # DEFAULT CONFIGURATIONS (Flags)
 # ==================================================
 DRY_RUN=false
+RUN_POST_INSTALL_SCRIPT=false
 DRY_FLAG=""
+POST_INSTALL_DRY_FLAG=""
 
 # ==================================================
 # HELP MENU FUNCTION
@@ -22,59 +24,76 @@ show_help() {
   echo ""
   echo "Commands:"
   echo "  run                  Execute the actual deployment process."
+  echo "  only-post-install    Only execute the post-install-script."
   echo ""
   echo "Options (only applicable with the 'run' command):"
   echo "  -d, --dry-run        Simulate the upgrade process. Does not download"
   echo "                       or install any packages to the drive."
+  echo "  -p, --post-install   Also run the post install script."
   echo "  -h, --help           Display this help screen and exit."
   echo ""
   echo "Examples:"
-  echo "  $0                  # Shows this help menu"
-  echo "  $0 run              # Executes the full deployment"
-  echo "  $0 run --dry-run    # Simulates the deployment safely"
+  echo "  $0                   # Shows this help menu"
+  echo "  $0 run               # Executes the full deployment"
+  echo "  $0 run --dry-run     # Simulates the deployment safely"
+  echo "  $0 run -p            # Executes the full deployment including the post-install"
+  echo "  $0 only-post-install # Only executes the post-install-script"
   exit 0
 }
 
 # Helper function to extract value safely
 extract_value() {
-    local file="$1"
-    local pattern="$2"
-    local varname="$3"
-    
-    # Check if file exists and is readable
-    if [[ ! -f "$file" ]]; then
-        echo "Error: File not found: $file" >&2
-        declare -g "$varname="
-        return 1
-    fi
-    
-    if [[ ! -r "$file" ]]; then
-        echo "Error: Cannot read file: $file" >&2
-        declare -g "$varname="
-        return 1
-    fi
-    
-    # Extract first match, trim whitespace, assign to global variable
-    local value
-    value=$(grep -m 1 "^${pattern}=" "$file" 2>/dev/null | head -1 | cut -d'=' -f2- | tr -d '[:space:]')
-    
-    if [[ -z "$value" ]]; then
-        echo "Error: Pattern '$pattern' not found or empty in $file" >&2
-        declare -g "$varname="
-        return 1
-    fi
-    
-    declare -g "$varname=$value"
-    return 0
+  local file="$1"
+  local pattern="$2"
+  local varname="$3"
+  
+  # Check if file exists and is readable
+  if [[ ! -f "$file" ]]; then
+      echo "Error: File not found: $file" >&2
+      declare -g "$varname="
+      return 1
+  fi
+  
+  if [[ ! -r "$file" ]]; then
+      echo "Error: Cannot read file: $file" >&2
+      declare -g "$varname="
+      return 1
+  fi
+  
+  # Extract first match, trim whitespace, assign to global variable
+  local value
+  value=$(grep -m 1 "^${pattern}=" "$file" 2>/dev/null | head -1 | cut -d'=' -f2- | tr -d '[:space:]')
+  
+  if [[ -z "$value" ]]; then
+      echo "Error: Pattern '$pattern' not found or empty in $file" >&2
+      declare -g "$varname="
+      return 1
+  fi
+  
+  declare -g "$varname=$value"
+  return 0
 }
 
 # ==================================================
 # SUBCOMMAND VALIDATION
 # ==================================================
 # If no arguments are passed, or the first argument isn't "run", show help.
-if [ $# -eq 0 ] || [ "$1" != "run" ]; then
+if [ $# -eq 0 ] || [ "$1" != "run" ] || [ "$1" != "only-post-install" ]; then
   # If they specifically asked for help via -h or --help, show it too
   show_help
+fi
+
+run_post_install_script() {
+  sudo apt-get install -y git && \
+    tmp_repo="$(mktemp -d -p "${TMPDIR:-/tmp}" lcafe.XXXXXXXX)" && \
+    bash -c "trap 'trap - EXIT INT TERM; rm -rf -- $tmp_repo' EXIT INT TERM && \
+    git clone --depth 1 https://github.com/timhansinger/linux-cafe-ebersbach-linux-mint-cinnamon-post-install-script $tmp_repo && \
+    bash $tmp_repo/run.sh $POST_INSTALL_DRY_FLAG"
+}
+
+if [ "$1" = "only-post-install" ]; then
+  run_post_install_script
+  exit
 fi
 
 # Remove "run" from the argument list so we can parse the remaining options
@@ -86,7 +105,8 @@ shift
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -h|--help)         show_help ;;
-    -d|--dry-run)      DRY_RUN=true; DRY_FLAG="-s"; shift ;;
+    -d|--dry-run)      DRY_RUN=true; DRY_FLAG="-s"; POST_INSTALL_DRY_FLAG="--dry-run"; shift ;;
+    -p|--post-install) RUN_POST_INSTALL_SCRIPT=true; shift ;;
     *) echo "Unknown option: $1"; echo "Use $0 --help to see available options."; exit 1 ;;
   esac
 done
@@ -127,6 +147,7 @@ echo "=================================================="
 
 # Show active flags to the technician
 [ "$DRY_RUN" = true ] && echo "--> MODE: [DRY-RUN / SIMULATION]"
+[ "$RUN_POST_INSTALL_SCRIPT" = true ] && echo "--> MODE: [ALSO RUN POST INSTALLATION SCRIPT]"
 
 # Define paths
 ORIGINAL_SOURCES="/etc/apt/sources.list.d/official-package-repositories.list"
@@ -267,3 +288,5 @@ sudo apt-get dist-upgrade $DRY_FLAG -y
 echo "=================================================="
 echo " Done! All user configurations and updates applied. "
 echo "=================================================="
+
+[ "$RUN_POST_INSTALL_SCRIPT" = true ] && run_post_install_script
