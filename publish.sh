@@ -6,7 +6,6 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
 # Install prerequisites
 apt install pandoc
 
-# MARKDOWN=index.md
 MARKDOWN=index-german.md
 CSS="github-markdown-light.css"
 TARGET="/srv/aptly/public"
@@ -23,5 +22,4 @@ pandoc -s \
   -o "$TARGET/index.html"
 
 install -m 644 "$SCRIPT_DIR/setup.sh" "$TARGET/setup.sh"
-install -m 644 "$SCRIPT_DIR/post-install-script.sh" "$TARGET/post-install-script.sh"
 install -m 644 "$SCRIPT_DIR/$CSS" "$TARGET/style.css"
