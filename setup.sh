@@ -5,6 +5,12 @@
 # ==================================================
 LINUX_MIRROR="linux-mirror.local"
 
+MINT_MIRROR="[trusted=yes] http://${LINUX_MIRROR}/mint"
+UBUNTU_MIRROR="[trusted=yes] http://${LINUX_MIRROR}/ubuntu"
+
+MINT_MIRROR_LOCAL="https://ftp-stud.hs-esslingen.de/pub/Mirrors/packages.linuxmint.com"
+UBUNTU_MIRROR_LOCAL="http://ftp-stud.hs-esslingen.de/ubuntu"
+
 # ==================================================
 # DEFAULT CONFIGURATIONS (Flags)
 # ==================================================
@@ -113,7 +119,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # ==================================================
-# 1. INITIALIZE SUDO ELEVATION UPFRONT
+# INITIALIZE SUDO ELEVATION UPFRONT
 # ==================================================
 echo "Please authenticate to initialize administrative privileges for system updates:"
 sudo -v || exit 1
@@ -122,25 +128,7 @@ sudo -v || exit 1
 while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
 
 # ==================================================
-# 2. RUN USER SPECIFIC SETTINGS (No sudo needed)
-# ==================================================
-#echo "=================================================="
-#echo " Applying User-Specific Settings for: $USER"
-#echo "=================================================="
-
-# Example: Configure Neovim to use system clipboard for this specific user
-#echo "--> Configuring Neovim clipboard..."
-#mkdir -p "$HOME/.config/nvim"
-#cat << 'EOF' > "$HOME/.config/nvim/init.lua"
-#vim.opt.clipboard = "unnamed,unnamedplus"
-#EOF
-
-# Example: Set custom desktop wallpaper or panel preferences via gsettings
-#echo "--> Setting default desktop preferences..."
-#gsettings set org.cinnamon.desktop.background picture-uri "file:///usr/share/backgrounds/linuxmint/default.jpg" 2>/dev/null
-
-# ==================================================
-# 3. RUN SYSTEM WIDE SETTINGS (Prefix commands with sudo)
+# RUN SYSTEM WIDE SETTINGS (Prefix commands with sudo)
 # ==================================================
 echo "=================================================="
 echo " Starting Dynamic Mirror Injection (System Level) "
@@ -152,41 +140,40 @@ echo "=================================================="
 
 # Define paths
 ORIGINAL_SOURCES="/etc/apt/sources.list.d/official-package-repositories.list"
-BACKUP_SOURCES="/etc/apt/sources.list.d/official-package-repositories.list.bak"
-TEMPORARY_MIRROR_LIST="/tmp/00-local-mirror.list"
+BACKUP_SOURCES="$ORIGINAL_SOURCES.bak"
 TEMP_SOURCES="/etc/apt/sources.list.d/00-local-mirror.list"
 
-# ==================================================
-# INITIALIZE CLEANUP / TRAP - START
-# ==================================================
 cleanup() {
-    local code=$?
-    trap - EXIT INT TERM # avoid re-entry
+  local code=$?
+  trap - EXIT INT TERM # avoid re-entry
 
-    echo -e "\nCleaning up (code $code, signal: ${SIGNAL:-none})"
+  echo -e "\nCleaning up (code $code, signal: ${SIGNAL:-none})"
 
-    # echo -e "\nScript completed. Running cleanup..."
-
-    echo "--> Restoring customer machine back to default official repositories..."
+  # If we use DRY_RUN or if we exited with an error we restore the original repositories
+  if [[ "$DRY_RUN" == true ]] || (( code != 0 )); then
+    echo "--> Restoring customer machine back to previous repositories..."
     # Bring the official file back
     sudo mv "$BACKUP_SOURCES" "$ORIGINAL_SOURCES" 2>/dev/null
-    
-    # Delete the temporary local mirror file
-    sudo rm -f "$TEMP_SOURCES" 2>/dev/null
+  fi
 
-    # Re-index so the customer's cache points home
-    echo "--> Re-indexing database back to official web paths..."
-    sudo apt-get update
+  # Delete the temporary local mirror file
+  sudo rm -f "$TEMP_SOURCES" 2>/dev/null
 
-    exit "$code"
+  # Re-index so the customer's cache points home
+  echo "--> Re-indexing database..."
+  sudo apt-get update
+
+  # This is needed so that the repository sources are correctly shown in Update Manager
+  echo "--> Re-starting Update Manager..."
+  pkill -f mintupdate; mintupdate > /dev/null 2>&1
+  echo "--> Re-starting Update Manager..."
+
+  echo "=================================================="
+  echo " Finished! Cleanup performed. "
+  echo "=================================================="
+
+  exit "$code"
 }
-
-trap 'SIGNAL=SIGINT;  exit 130' INT
-trap 'SIGNAL=SIGTERM; exit 143' TERM
-trap cleanup EXIT
-# ==================================================
-# INITIALIZE CLEANUP / TRAP - END
-# ==================================================
 
 # Verify official list exists
 if [ ! -f "$ORIGINAL_SOURCES" ]; then
@@ -199,81 +186,101 @@ echo "--> Creating local mirror paths automatically..."
 echo ""
 
 # Extract codenames
-extract_value "/etc/linuxmint/info" "CODENAME" "codename"
-extract_value "/etc/upstream-release/lsb-release" "DISTRIB_CODENAME" "basecodename"
+extract_value "/etc/linuxmint/info" "CODENAME" "CODENAME"
+extract_value "/etc/upstream-release/lsb-release" "DISTRIB_CODENAME" "BASECODENAME"
 
 # Only proceed if we have codenames loaded
-if [[ -z "$codename" ]] || [[ -z "$basecodename" ]]; then
+if [[ -z "$CODENAME" ]] || [[ -z "$BASECODENAME" ]]; then
     echo "Error: Could not determine codename(s)." >&2
     exit 1
 fi
 
-# Verify mintsources config directory exists
-MINTCONFIG_DIR="/usr/share/mintsources/${codename}"
-if [[ ! -d "$MINTCONFIG_DIR" ]]; then
-    echo "Error: Mintsources config directory not found: $MINTCONFIG_DIR" >&2
-    exit 1
-fi
-
-MINTCONFIG_FILE="${MINTCONFIG_DIR}/mintsources.conf"
-
-# Extract mirrors if config exists
-if [[ -f "$MINTCONFIG_FILE" ]]; then
-    extract_value "$MINTCONFIG_FILE" "default" "mirror"
-    extract_value "$MINTCONFIG_FILE" "base_default" "basemirror"
-else
-    echo "Error: Mintsources config not found: $MINTCONFIG_FILE" >&2
-    exit 1
-fi
-
-# Only proceed if we have mirrors loaded
-if [[ -z "$mirror" ]] || [[ -z "$basemirror" ]]; then
-    echo "Error: Could not determine mirror(s)." >&2
-    exit 1
-fi
-
-# Handle optionalcomponents
-optionalcomponents=""
-
-# Optional: Verification output (remove in production or make conditional)
+# Optional: Verification output
 echo "Configuration loaded:"
-echo "  codename: $codename"
-echo "  basecodename: $basecodename"
-echo "  mirror: $mirror"
-echo "  basemirror: $basemirror"
-echo "  optionalcomponents: $optionalcomponents"
+echo "  codename: $CODENAME"
+echo "  basecodename: $BASECODENAME"
 echo ""
 
 # Process template
-TEMPLATE_FILE="/usr/share/mintsources/${codename}/official-package-repositories.list"
+TEMPLATE_FILE="/usr/share/mintsources/${CODENAME}/official-package-repositories.list"
 
 [[ -f "$TEMPLATE_FILE" ]] || { echo "Error: Template not found: $TEMPLATE_FILE" >&2; exit 1; }
 
-# Substitute variables using sed
-sed -E \
-    -e 's|\$mirror|'"[trusted=yes] http://${LINUX_MIRROR}/mint"'|g' \
-    -e 's|\$basemirror|'"[trusted=yes] http://${LINUX_MIRROR}/ubuntu"'|g' \
-    -e 's|\$codename|'"$codename"'|g' \
-    -e 's|\$basecodename|'"$basecodename"'|g' \
-    -e 's|\$optionalcomponents|'"$optionalcomponents"'|g' \
-    -e "s|https?://security.ubuntu.com/ubuntu/?|[trusted=yes] http://${LINUX_MIRROR}/ubuntu|g" \
-    "$TEMPLATE_FILE" > "$TEMPORARY_MIRROR_LIST"
+generate_mirror_list() {
+    local mint_mirror \
+          ubuntu_mirror \
+          template_file \
+          temporary_output_file="/tmp/00-local-mirror.list" \
+          output_file \
+          codename \
+          basecodename \
+          optionalcomponents="" \
+          replace_security=false
 
-if [[ ! -f "$TEMPORARY_MIRROR_LIST" ]] || [[ ! -s "$TEMPORARY_MIRROR_LIST" ]]; then
-    echo "Error: Failed to create temporary mirror list file" >&2
-    exit 1
-fi
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --mint-mirror)        mint_mirror="$2"; shift 2 ;;
+            --ubuntu-mirror)      ubuntu_mirror="$2"; shift 2 ;;
+            --template)           template_file="$2"; shift 2 ;;
+            --temporary-output)   temporary_output_file="$2"; shift 2 ;;
+            --output)             output_file="$2"; shift 2 ;;
+            --basecodename)       basecodename="$2"; shift 2 ;;
+            --codename)           codename="$2"; shift 2 ;;
+            --optionalcomponents) optionalcomponents="$2"; shift 2 ;;
+            --replace-security)   replace_security=true; shift ;;
+            *) echo "Unknown option: $1" >&2; return 1 ;;
+        esac
+    done
 
-sudo mv -f "$TEMPORARY_MIRROR_LIST" "$TEMP_SOURCES"
+    local sed_args=(
+        -E
+        -e "s|\\\$mirror|${mint_mirror}|g"
+        -e "s|\\\$basemirror|${ubuntu_mirror}|g"
+        -e "s|\\\$codename|${codename}|g"
+        -e "s|\\\$basecodename|${basecodename}|g"
+        -e "s|\\\$optionalcomponents|${optionalcomponents}|g"
+    )
 
-if [[ ! -f "$TEMP_SOURCES" ]] || [[ ! -s "$TEMP_SOURCES" ]]; then
-    echo "Error: Failed to create temporary sources file" >&2
-    exit 1
-fi
+    if [[ "$replace_security" == "true" ]]; then
+        sed_args+=(-e "s|https?://security.ubuntu.com/ubuntu/?|${ubuntu_mirror}|g")
+    fi
 
-echo "Successfully created: $TEMP_SOURCES"
-echo ""
-cat "$TEMP_SOURCES"
+    sed "${sed_args[@]}" "$template_file" > "$temporary_output_file"
+
+    if [[ ! -f "$temporary_output_file" ]] || [[ ! -s "$temporary_output_file" ]]; then
+        echo "Error: Failed to create temporary file '$temporary_output_file'" >&2
+        exit 1
+    fi
+    
+    sudo mv -f "$temporary_output_file" "$output_file"
+    
+    if [[ ! -f "$output_file" ]] || [[ ! -s "$output_file" ]]; then
+        echo "Error: Failed to create file '$output_file'" >&2
+        exit 1
+    fi
+    
+    echo "Successfully created: $output_file"
+    echo ""
+    cat "$output_file"
+}
+
+# ==================================================
+# INITIALIZE CLEANUP
+# ==================================================
+trap 'SIGNAL=SIGINT;  exit 130' INT
+trap 'SIGNAL=SIGTERM; exit 143' TERM
+trap cleanup EXIT
+
+# ==================================================
+# PERFORM ACTUAL CHANGES TO THE SYSTEM
+# ==================================================
+generate_mirror_list --mint-mirror "$MINT_MIRROR" \
+                     --ubuntu-mirror "$UBUNTU_MIRROR" \
+                     --template "$TEMPLATE_FILE" \
+                     --output "$TEMP_SOURCES" \
+                     --basecodename "$BASECODENAME" \
+                     --codename "$CODENAME" \
+                     --replace-security
 
 # HIDE THE OFFICIAL LIST (Move it so APT ignores it entirely)
 # This guarantees APT can ONLY talk to LINUX_MIRROR for system packages
@@ -291,3 +298,14 @@ echo " Done! All user configurations and updates applied. "
 echo "=================================================="
 
 [ "$RUN_POST_INSTALL_SCRIPT" = true ] && run_post_install_script
+
+echo "=================================================="
+echo " Switch to official local repositories. "
+echo "=================================================="
+
+generate_mirror_list --mint-mirror "$MINT_MIRROR_LOCAL" \
+                     --ubuntu-mirror "$UBUNTU_MIRROR_LOCAL" \
+                     --template "$TEMPLATE_FILE" \
+                     --output "$ORIGINAL_SOURCES" \
+                     --basecodename "$BASECODENAME" \
+                     --codename "$CODENAME"
