@@ -5,7 +5,7 @@ Diese Maschine stellt einen lokalen apt-Mirror sowie ein Hilfsskript für Update
 ## Führen Sie dies auf Ihrem Client-Rechner aus
 
 ```bash
-curl -fsSL http://linux-mirror.local/setup.sh | bash -s -- run
+curl -fsSL http://linux-mirror.local/setup.sh | bash -s -- run --post-install
 ```
 
 ## Was es macht
