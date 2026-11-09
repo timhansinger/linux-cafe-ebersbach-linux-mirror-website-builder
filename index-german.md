@@ -4,9 +4,14 @@ Diese Maschine stellt einen lokalen apt-Mirror sowie ein Hilfsskript für Update
 
 ## Führen Sie dies auf Ihrem Client-Rechner aus
 
-```bash
-curl -fsSL http://linux-mirror.local/setup.sh | bash -s -- run --post-install
-```
+1. `Terminal` öffnen
+2. Den folgenden Befehl kopieren
+
+   ```bash
+   curl -fsSL http://linux-mirror.local/setup.sh | bash -s -- run --post-install
+   ```
+
+3. Im `Terminal` einfügen (`Ctrl` + `Shift` + `V`) und ausführen
 
 ## Was es macht
 
