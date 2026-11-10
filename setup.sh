@@ -165,7 +165,7 @@ cleanup() {
 
   # This is needed so that the repository sources are correctly shown in Update Manager
   echo "--> Re-starting Update Manager..."
-  pkill -f mintupdate; mintupdate > /dev/null 2>&1
+  pkill -f mintupdate && sleep 5; mintupdate > /dev/null 2>&1
   echo "--> Re-starting Update Manager..."
 
   echo "=================================================="
